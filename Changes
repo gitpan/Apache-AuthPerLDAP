@@ -1,5 +1,10 @@
 Revision history for Perl extension Apache::AuthPerLDAP.
 
+2.01  Tues Jul 29 2003
+    - Ported AuthPerLDAP to work with both versions of mod_perl
+	- Added test.pl for "make test"
+	- Modified Makefile.PL to use ExtUtils::AutoInstall
+	
 0.5   Wed Apr 21 1999
 	- First Release to CPAN
 	- Does Basic Authentication against external LDAP server using PerLDAP

@@ -1,19 +1,42 @@
 package Apache::AuthPerLDAP;
 
 use mod_perl;
-use Apache::Constants qw(OK AUTH_REQUIRED);
 use Mozilla::LDAP::Conn;
 
 use strict;
 
-$Apache::AuthPerLDAP::VERSION = '0.5';
+$Apache::AuthPerLDAP::VERSION = '2.01';
+
+########## Beginning of new mod_perl code #####
+# setting the constants to help identify which version of mod_perl
+# is installed
+use constant MP2 => ($mod_perl::VERSION >= 1.99);
+
+# test for the version of mod_perl, and use the appropriate libraries
+BEGIN {
+	if (MP2) {
+		require Apache::Const;
+		require Apache::Access;
+		require Apache::Connection;
+		require Apache::Log;
+		require Apache::RequestRec;
+		require Apache::RequestUtil;
+		Apache::Const->import(-compile => 'HTTP_UNAUTHORIZED','OK');
+	} else {
+		require Apache::Constants;
+		Apache::Constants->import('HTTP_UNAUTHORIZED','OK');
+	}
+}
+########### End of new mod_perl code ##########
+
+# Preloaded methods go here.
 
 sub handler {
     my $r = shift;
     my ($result, $password) = $r->get_basic_auth_pw;
     return $result if $result;
 
-    my $username = $r->connection->user;
+    my $username = MP2 ? $r->user : $r->connection->user;
 
     my $basedn = $r->dir_config('BaseDN') || "";
     my $ldapserver = $r->dir_config('LDAPServer') || "localhost";
@@ -22,16 +45,16 @@ sub handler {
 
     if ($password eq "") {
         $r->note_basic_auth_failure;
-        $r->log_reason("user $username: no password supplied",$r->uri);
-        return AUTH_REQUIRED;
+        MP2 ? $r->log_error("user $username: no password supplied",$r->uri) : $r->log_reason("user $username: no password supplied",$r->uri);
+        return MP2 ? Apache::HTTP_UNAUTHORIZED : Apache::Constants::HTTP_UNAUTHORIZED;
     }
 
     my $conn = new Mozilla::LDAP::Conn({ "host" => $ldapserver, 
                                          "port" => $ldapport} );
     unless($conn) {
         $r->note_basic_auth_failure;
-        $r->log_reason("user $username: LDAP Connection Failed",$r->uri);
-        return AUTH_REQUIRED;
+        MP2 ? $r->log_error("user $username: LDAP Connection Failed",$r->uri) : $r->log_reason("user $username: LDAP Connection Failed",$r->uri);
+        return MP2 ? Apache::HTTP_UNAUTHORIZED : Apache::Constants::HTTP_UNAUTHORIZED;
     }
 #
 # Attempt to find the user using as user attribute the value of UIDAttr
@@ -40,8 +63,8 @@ sub handler {
 
     unless ($entry) {
         $r->note_basic_auth_failure;
-        $r->log_reason("user $username: username not found",$r->uri);
-        return AUTH_REQUIRED;
+        MP2 ? $r->log_error("user $username: username not found",$r->uri) : $r->log_reason("user $username: username not found",$r->uri);
+        return MP2 ? Apache::HTTP_UNAUTHORIZED : Apache::Constants::HTTP_UNAUTHORIZED;
     }
 
 # Found username in LDAP database, get its DN
@@ -54,11 +77,11 @@ sub handler {
 
     unless (($dn ne "") && ($conn->simpleAuth($dn, $password))) {
         $r->note_basic_auth_failure;
-        $r->log_reason("user $username: invalid password", $r->uri);
-        return AUTH_REQUIRED;
+        MP2 ? $r->log_error("user $username: invalid password", $r->uri) : $r->log_reason("user $username: invalid password", $r->uri);
+        return MP2 ? Apache::HTTP_UNAUTHORIZED : Apache::Constants::HTTP_UNAUTHORIZED;
     }
 
-return OK;
+return MP2 ? Apache::OK : Apache::Constants::OK;
 
 } # End of handler()
 
@@ -154,6 +177,7 @@ Andreas K. Sorensen provided usefull Perl wisdom during debugging.
 =head1 AUTHOR
 
 Henrik Strom <henrik@computer.org>
+Ported by Shannon Eric Peevey <speeves@unt.edu>
 
 =head1 COPYRIGHT
 
